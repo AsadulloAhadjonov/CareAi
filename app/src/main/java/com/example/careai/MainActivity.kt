@@ -2,6 +2,7 @@ package com.example.careai
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,9 +11,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
 import android.graphics.Bitmap
 import android.media.MediaPlayer
 import android.media.audiofx.Visualizer
@@ -22,28 +20,125 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.camera2.pipe.core.Log
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.pager.*
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -64,21 +159,16 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -89,10 +179,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.OutputStream
 import java.util.Calendar
+import java.util.Locale
 
 // --- RANG PALITRASI ---
 val PrimaryPurple = Color(0xFF0057FF)
@@ -161,19 +251,24 @@ class MainActivity : ComponentActivity() {
                     composable("oyna_b") {
                         SignInScreen(
                             onBack = {
-                                // Agar orqaga qaytsa Registerga qaytishi kerak
                                 navController.navigate("oyna_a")
                             },
                             onFinishAuth = {
                                 navController.navigate("main_pager") {
-                                    popUpTo("oyna_b") { inclusive = true }
+                                    popUpTo(0) { inclusive = true }
                                 }
                             }
                         )
                     }
 
                     composable("main_pager") {
-                        MainVerticalPager()
+                        MainVerticalPager(
+                            onLogout = {
+                                navController.navigate("oyna_a") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -232,7 +327,7 @@ fun sendLocalNotification(context: Context, title: String, message: String) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 @Preview(showBackground = true)
-fun MainVerticalPager() {
+fun MainVerticalPager(onLogout: () -> Unit = {}) {
     val pagerState = rememberPagerState(pageCount = { 5 })
     val coroutineScope = rememberCoroutineScope()
     var isAllowedToScroll by remember { mutableStateOf(false) }
@@ -287,7 +382,10 @@ fun MainVerticalPager() {
 
         // MainVerticalPager ichida...
         if (showSettings) {
-            SettingsScreen(onClose = { showSettings = false })
+            SettingsScreen(
+                onClose = { showSettings = false },
+                onLogout = onLogout
+            )
         }
     }
 }
@@ -678,10 +776,11 @@ fun ListenMusicScreen() {
 }
 
 @Composable
-fun SettingsScreen(onClose: () -> Unit) {
+fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var showNotifDialog by remember { mutableStateOf(false) }
     var isNotifEnabled by rememberSaveable { mutableStateOf(true) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -777,9 +876,7 @@ fun SettingsScreen(onClose: () -> Unit) {
             }
 
             Button(
-                onClick = {
-
-                },
+                onClick = { showLogoutDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -792,6 +889,41 @@ fun SettingsScreen(onClose: () -> Unit) {
                     Spacer(Modifier.width(8.dp))
                     Text("Tizimdan chiqish", color = Color.Red, fontWeight = FontWeight.Bold)
                 }
+            }
+
+            // --- LOGOUT TASDIQLASH DIALOGI ---
+            if (showLogoutDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutDialog = false },
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = Color.White,
+                    title = {
+                        Text("Chiqishni tasdiqlang", fontWeight = FontWeight.Bold, color = OnSurface)
+                    },
+                    text = {
+                        Text("Haqiqatan ham tizimdan chiqmoqchimisiz?", color = TextGray)
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showLogoutDialog = false
+                                // Tokenni SharedPreferences'dan o'chirish
+                                val prefs = context.getSharedPreferences("CareAI_Prefs", Context.MODE_PRIVATE)
+                                prefs.edit().remove("access_token").remove("user_name").apply()
+                                onLogout()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.8f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Ha, chiqish", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showLogoutDialog = false }) {
+                            Text("Bekor qilish", color = TextGray)
+                        }
+                    }
+                )
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -1751,152 +1883,18 @@ fun AnimatedVoiceAvatar(onMicClick: () -> Unit) {
     }
 }
 
-@Composable
-fun ActionButtons() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val recorder = remember { VoiceRecorder(context) }
-    var isRecording by remember { mutableStateOf(false) }
-
-//    val sessionIdByClient = remember {
-//        47
-//    }
-    var currentSessionId by remember { mutableStateOf<Int?>(null) }
-
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { exoPlayer.release() }
-    }
-
-    val playResponse: (String) -> Unit = { url ->
-        // Agar server faqat yo'lni yuborsa, IPni qo'shamiz
-        val fullUrl = if (url.startsWith("http")) url else "http://213.230.91.55:8111$url"
-
-        val mediaItem = MediaItem.fromUri(fullUrl)
-        exoPlayer.setMediaItem(mediaItem)
-        exoPlayer.prepare()
-        exoPlayer.play()
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 48.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SecondaryButton(Icons.Default.PhoneAndroid)
-
-        Spacer(modifier = Modifier.width(32.dp))
-
-        // Animatsiya: Glow'ning kengayishi va qisqarishi
-        val infiniteTransition = rememberInfiniteTransition(label = "mic_glow")
-        val sc by infiniteTransition.animateFloat(
-            initialValue = 0.8f,
-            targetValue = if (isRecording) 1.5f else 1.0f, // Yozayotganda qattiqroq pulsatsiya
-            animationSpec = infiniteRepeatable(
-                animation = tween(1000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ), label = ""
-        )
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
-            // 1. Glow (Nurlanish)
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                if (isRecording) { // Faqat yozayotganda nur chiqadi
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Primary.copy(alpha = 0.6f), Color.Transparent),
-                            center = center,
-                            radius = (size.minDimension / 2) * sc
-                        )
-                    )
-                }
-            }
-
-            // 2. Asosiy tugma
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Primary, PrimaryContainer)
-                        )
-                    )
-                    // ... (ActionButtons ichidagi clickable qismi)
-                    .clickable {
-                        if (isRecording) {
-                            val file = recorder.stopRecording()
-                            isRecording = false
-                            file?.let { audioFile ->
-                                scope.launch {
-                                    // currentSessionId yuboramiz (null bo'lsa server yangi yaratadi)
-                                    val responseData =
-                                        sendFileToBackend(audioFile, context, currentSessionId)
-
-                                    if (responseData != null) {
-                                        // Serverdan kelgan session_id ni saqlaymiz
-                                        currentSessionId = responseData.sessionId
-
-                                        withContext(Dispatchers.Main) {
-                                            Toast.makeText(
-                                                context,
-                                                responseData.reply,
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
-                                        responseData.audioUrl?.let { playResponse(it) }
-                                    }
-                                }
-                            }
-                        } else {
-                            recorder.startRecording()
-                            isRecording = true
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(32.dp))
-
-        SecondaryButton(Icons.Default.Keyboard)
-    }
-}
-
-suspend fun sendFileToBackend(
-    file: File,
-    context: Context,
-    sessionId: Int?  // null bo'lishi mumkin
+// Backendga faqat matn yuborish funksiyasi
+suspend fun sendMessageToBackend(
+    message: String,
+    context: Context
 ): ChatResponse? {
     val prefs = context.getSharedPreferences("CareAI_Prefs", Context.MODE_PRIVATE)
     val token = prefs.getString("access_token", "") ?: ""
-    Toast.makeText(context, "$sessionId", Toast.LENGTH_SHORT).show()
+
     return withContext(Dispatchers.IO) {
         try {
-            val requestFile = file.asRequestBody("audio/mp4".toMediaTypeOrNull())
-            val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
-
-            val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
-            builder.addFormDataPart("file", file.name, requestFile)
-
-            // session_id faqat mavjud bo'lsa yuboramiz
-            if (sessionId != null) {
-                builder.addFormDataPart("session_id", sessionId.toString())
-            }
-
-            val response = RetrofitClient.instance.sendAudio("Bearer $token", body,
-                sessionId?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull()))
+            val request = ChatRequest(message = message)
+            val response = RetrofitClient.instance.sendChatMessage("Bearer $token", request)
 
             if (response.isSuccessful) {
                 response.body()
@@ -1910,20 +1908,153 @@ suspend fun sendFileToBackend(
     }
 }
 
-fun playRecordedAudio(file: File, context: Context) {
-    try {
-        val mediaPlayer = android.media.MediaPlayer()
-        mediaPlayer.setDataSource(file.absolutePath)
-        mediaPlayer.prepare()
-        mediaPlayer.start()
+@Composable
+fun ActionButtons() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-        // Tugagandan keyin resursni bo'shatish
-        mediaPlayer.setOnCompletionListener {
-            it.release()
-            Toast.makeText(context, "Boldi", Toast.LENGTH_SHORT).show()
+    // 1. TTS Holati va obyektini boshqarish
+    var isTtsReady by remember { mutableStateOf(false) }
+    val tts = remember {
+        var instance: TextToSpeech? = null
+        instance = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                // O'zbek tilini o'rnatishga urinish
+                val result = instance?.setLanguage(Locale("uz"))
+                if (result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED) {
+                    isTtsReady = true
+                } else {
+                    // Agar o'zbekcha bo'lmasa, standart tilga qaytadi
+                    instance?.setLanguage(Locale.US)
+                    isTtsReady = true
+                }
+            }
         }
-    } catch (e: Exception) {
-        android.util.Log.e("CareAI", "Ovozni qo'yishda xato: ${e.message}")
+        instance
+    }
+
+    var isWaitingResponse by remember { mutableStateOf(false) }
+
+    // 2. STT (Voice-to-Text) Launcher
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = data?.get(0) ?: ""
+
+            if (spokenText.isNotEmpty()) {
+                isWaitingResponse = true
+                scope.launch {
+                    val responseData = sendMessageToBackend(spokenText, context)
+                    withContext(Dispatchers.Main) {
+                        if (responseData != null) {
+                            // Toastda ko'rsatish
+                            Toast.makeText(context, responseData.reply, Toast.LENGTH_LONG).show()
+
+                            // GAPIRTIRISH QISMI
+                            if (isTtsReady) {
+                                tts.speak(
+                                    responseData.reply,
+                                    TextToSpeech.QUEUE_FLUSH,
+                                    null,
+                                    "CareAI_Response"
+                                )
+                            }
+                        }
+                        isWaitingResponse = false
+                    }
+                }
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 48.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SecondaryButton(Icons.Default.PhoneAndroid)
+
+        Spacer(modifier = Modifier.width(32.dp))
+
+        // 3. GLOW (Nurlanish) Animatsiyasi
+        val infiniteTransition = rememberInfiniteTransition(label = "glow")
+        val scale by infiniteTransition.animateFloat(
+            initialValue = 1.0f,
+            targetValue = if (isWaitingResponse) 1.6f else 1.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = LinearOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ), label = ""
+        )
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = if (isWaitingResponse) 0.1f else 0.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = LinearOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ), label = ""
+        )
+
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
+            // Nurlanish effektini chizish
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                if (isWaitingResponse) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Primary.copy(alpha = alpha), Color.Transparent),
+                            center = center,
+                            radius = (size.minDimension / 2.5f) * scale
+                        )
+                    )
+                }
+            }
+
+            // Asosiy Mikrofon Tugmasi
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Primary, PrimaryContainer)))
+                    .clickable {
+                        if (!isWaitingResponse) {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "uz-UZ")
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Sizni eshityapman...")
+                            }
+                            try {
+                                speechRecognizerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "STT xatosi!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isWaitingResponse) Icons.Default.Sync else Icons.Default.Mic,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(32.dp))
+
+        SecondaryButton(Icons.Default.Keyboard)
+    }
+
+    // Xotirani tozalash
+    DisposableEffect(Unit) {
+        onDispose {
+            tts.stop()
+            tts.shutdown()
+        }
     }
 }
 
