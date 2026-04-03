@@ -12,6 +12,7 @@ animationCore = "1.10.6"
 foundation = "1.10.6"
 gamesActivity = "4.4.0"
 uiGraphics = "1.10.6"
+cameraCamera2Pipe = "1.6.0"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
@@ -33,6 +34,7 @@ androidx-compose-animation-core = { group = "androidx.compose.animation", name =
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 androidx-games-activity = { group = "androidx.games", name = "games-activity", version.ref = "gamesActivity" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
+androidx-camera-camera2-pipe = { group = "androidx.camera", name = "camera-camera2-pipe", version.ref = "cameraCamera2Pipe" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
