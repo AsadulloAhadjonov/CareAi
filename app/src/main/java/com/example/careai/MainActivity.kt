@@ -3,11 +3,16 @@ package com.example.careai
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Picture
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.view.animation.AnticipateOvershootInterpolator
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,7 +25,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -36,18 +40,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -56,7 +62,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.unit.toSize
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
@@ -64,6 +70,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.careai.ui.theme.CareAiTheme
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
 
 // --- RANG PALITRASI ---
 val PrimaryPurple = Color(0xFF8720DE)
@@ -723,185 +732,175 @@ fun RowScope.ColorCube(item: ColorItem, isSelected: Boolean, onClick: () -> Unit
         if (isSelected) Icon(Icons.Default.Check, null, tint = Color.White)
     }
 }
+// ... importlar ...
 
 @Composable
 fun ArtTherapyScreen(onNextPage: () -> Unit) {
+    val context = LocalContext.current
     var selectedOutlineId by remember { mutableIntStateOf(0) }
     var showColoringCanvas by remember { mutableStateOf(false) }
     var apiResponse by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Chizilgan yo'llarni saqlash
+    val picture = remember { android.graphics.Picture() }
     val paths = remember { mutableStateListOf<ColoredPath>() }
-    // Hozirgi chizilayotgan nuqta (recomposition uchun state)
-    var motionEvent by remember { mutableStateOf<MotionEvent?>(null) }
     var currentPath by remember { mutableStateOf<androidx.compose.ui.graphics.Path?>(null) }
-    var activeColor by remember { mutableStateOf(PrimaryPurple) }
+    var activeColor by remember { mutableStateOf(Color(0xFF6200EE)) }
 
-    val outlines = listOf(
-        R.drawable._947292__1_,
-        R.drawable._947292__1_,
-        R.drawable._947292__1_
-    )
+    // Canvas o'lchamini qat'iy ushlab turish uchun
+    var redrawTrigger by remember { mutableStateOf(0) }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundColor)) {
-        AtmosphericAura()
+    val outlines = listOf(R.drawable._947292__1_, R.drawable._947292__1_, R.drawable._947292__1_)
 
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
         Column(
             modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(20.dp))
-
             Text(
                 text = if (!showColoringCanvas) "Shaklni tanlang" else "Barmog'ingiz bilan bo'yang",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Light,
-                color = OnSurface,
-                textAlign = TextAlign.Center
+                fontSize = 24.sp, fontWeight = FontWeight.Medium, color = Color.Black
             )
-
             Spacer(modifier = Modifier.height(30.dp))
 
             if (!showColoringCanvas) {
                 // --- 1. TANLASH BOSQICHI ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     outlines.forEach { resId ->
                         Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color.White.copy(0.5f))
-                                .border(1.dp, Color.White.copy(0.8f), RoundedCornerShape(24.dp))
-                                .clickable {
-                                    selectedOutlineId = resId
-                                    showColoringCanvas = true
-                                },
+                            modifier = Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(24.dp)).background(Color.White)
+                                .clickable { selectedOutlineId = resId; showColoringCanvas = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(resId),
-                                contentDescription = null,
-                                modifier = Modifier.size(70.dp).padding(8.dp)
-                            )
+                            Image(painter = painterResource(resId), contentDescription = null, modifier = Modifier.size(70.dp))
                         }
                     }
                 }
             } else {
                 // --- 2. BO'YASH BOSQICHI ---
+                val painter = painterResource(selectedOutlineId)
+
+                // MUHIM: Canvasni Box ichiga olamiz va weight(1f) beramiz.
+                // Bu Box pastdagi elementlar o'zgarsa ham o'z nisbatini saqlaydi.
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(32.dp))
                         .background(Color.White)
-                        .border(2.dp, Color.White.copy(0.5f), RoundedCornerShape(32.dp))
-                        .pointerInput(activeColor) { // Rang o'zgarganda inputni yangilash
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    currentPath = androidx.compose.ui.graphics.Path().apply {
-                                        moveTo(offset.x, offset.y)
-                                    }
-                                },
-                                onDrag = { change, _ ->
-                                    currentPath?.lineTo(change.position.x, change.position.y)
-                                    // Canvasni majburan qayta chizish uchun motionEventni yangilaymiz
-                                    motionEvent = MotionEvent.create(change.position.x, change.position.y)
-                                },
-                                onDragEnd = {
-                                    currentPath?.let {
-                                        paths.add(ColoredPath(it, activeColor))
-                                    }
-                                    currentPath = null
-                                    motionEvent = null
-                                }
-                            )
-                        }
+                        .border(1.dp, Color.LightGray, RoundedCornerShape(32.dp))
                 ) {
-                    val painter = painterResource(selectedOutlineId)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(activeColor) {
+                                detectDragGestures(
+                                    onDragStart = { offset ->
+                                        currentPath = androidx.compose.ui.graphics.Path().apply { moveTo(offset.x, offset.y) }
+                                    },
+                                    onDrag = { change, _ ->
+                                        change.consume()
+                                        currentPath?.lineTo(change.position.x, change.position.y)
+                                        redrawTrigger++
+                                    },
+                                    onDragEnd = {
+                                        currentPath?.let { paths.add(ColoredPath(it, activeColor)) }
+                                        currentPath = null
+                                    }
+                                )
+                            }
+                    ) {
+                        redrawTrigger.let { }
 
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        // 1. Bo'yoqlar (Pastki qatlam)
-                        paths.forEach { coloredPath ->
-                            drawPath(
-                                path = coloredPath.path,
-                                color = coloredPath.color,
-                                style = Stroke(width = 45f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        // Picture faqat joriy o'lcham noldan katta bo'lsa yozadi
+                        if (size.width > 0 && size.height > 0) {
+                            val pictureCanvas = androidx.compose.ui.graphics.Canvas(
+                                picture.beginRecording(size.width.toInt(), size.height.toInt())
                             )
-                        }
 
-                        // 2. Hozirgi chizilayotgan chiziq
-                        currentPath?.let {
-                            motionEvent?.let { /* faqat trigger uchun */ }
-                            drawPath(
-                                path = it,
-                                color = activeColor,
-                                style = Stroke(width = 45f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                            )
-                        }
+                            val drawEverything: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit = {
+                                drawRect(color = Color.White, size = size)
+                                paths.forEach { coloredPath ->
+                                    drawPath(
+                                        path = coloredPath.path, color = coloredPath.color,
+                                        style = Stroke(width = 45f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                    )
+                                }
+                                currentPath?.let { path ->
+                                    drawPath(
+                                        path = path, color = activeColor,
+                                        style = Stroke(width = 45f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                    )
+                                }
+                                with(painter) {
+                                    draw(size = size, colorFilter = ColorFilter.tint(Color.Black.copy(0.8f)))
+                                }
+                            }
 
-                        // 3. SVG Konturi (Eng ustki qatlam - bo'yoqni berkitadi)
-                        with(painter) {
-                            draw(size, colorFilter = ColorFilter.tint(OnSurface.copy(0.8f)))
+                            // Ekran uchun
+                            drawEverything()
+
+                            // Picture xotirasi uchun
+                            androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
+                                this, layoutDirection, pictureCanvas, size
+                            ) {
+                                drawEverything()
+                            }
+                            picture.endRecording()
                         }
                     }
                 }
 
-                // Ranglar palitrasi
+                // Ranglar palitrasi - Balandligi o'zgarmas (Fixed height)
                 Row(
-                    modifier = Modifier.padding(vertical = 20.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    modifier = Modifier.height(80.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val colors = listOf(Color(0xFFFFB7B7), Color(0xFFB7D7FF), Color(0xFFB7FFB7), Color(0xFFFFF4B7), PrimaryPurple, Color.DarkGray)
+                    val colors = listOf(Color(0xFFFFB7B7), Color(0xFFB7D7FF), Color(0xFFB7FFB7), Color(0xFFFFF4B7), Color(0xFF6200EE), Color.DarkGray)
                     colors.forEach { color ->
                         Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (activeColor == color) 3.dp else 1.dp,
-                                    color = if (activeColor == color) OnSurface else Color.White,
-                                    shape = CircleShape
-                                )
+                            modifier = Modifier.size(40.dp).clip(CircleShape).background(color)
+                                .border(width = if (activeColor == color) 3.dp else 1.dp, color = if (activeColor == color) Color.Black else Color.Transparent, shape = CircleShape)
                                 .clickable { activeColor = color }
                         )
                     }
                 }
             }
 
-            // --- BOTTOM ACTIONS ---
-            if (showColoringCanvas) {
-                Box(modifier = Modifier.padding(bottom = 32.dp)) {
+            // --- 3. BOTTOM ACTIONS ---
+            // Bu qismning balandligini qat'iy (fixed) qilamiz, shunda u yuqoridagi Canvas-ni surmaydi
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp), // Matn chiqsa ham balandlik o'zgarmaydi
+                contentAlignment = Alignment.TopCenter
+            ) {
+                if (showColoringCanvas) {
                     if (apiResponse == null) {
-                        PrimaryAuthButton(text = if (isLoading) "Tahlil..." else "Tugatish va Tahlil") {
-                            isLoading = true
-                            apiResponse = "Sizning rang tanlovingiz va chiziqlaringiz ichki osoyishtalikka intilishingizni ko'rsatmoqda."
-                            isLoading = false
+                        Button(
+                            onClick = {
+                                isLoading = true
+                                val bitmap = createBitmapFromPicture(picture)
+                                saveBitmapToPublicGallery(context, bitmap)
+                                apiResponse = "Saqlandi!"
+                                isLoading = false
+                            },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(if (isLoading) "Tahlil..." else "Tugatish va Tahlil")
                         }
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = apiResponse!!,
-                                modifier = Modifier
-                                    .background(Color.White.copy(0.6f), RoundedCornerShape(20.dp))
-                                    .padding(16.dp),
-                                textAlign = TextAlign.Center,
-                                fontSize = 15.sp
-                            )
-                            Spacer(Modifier.height(16.dp))
+                            Text("Rasm Galereyaga saqlandi ✨", color = Color(0xFF4CAF50))
+                            Spacer(Modifier.height(12.dp))
                             Button(
                                 onClick = onNextPage,
-                                modifier = Modifier.height(56.dp).width(200.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                border = BorderStroke(1.dp, PrimaryPurple.copy(0.3f))
+                                modifier = Modifier.fillMaxWidth().height(56.dp)
                             ) {
-                                Text("Keyingisi", color = PrimaryPurple, fontWeight = FontWeight.Bold)
+                                Text("Keyingisi")
                             }
                         }
                     }
@@ -911,13 +910,50 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
     }
 }
 
-class MotionTrigger(val x: Float, val y: Float)
+fun saveBitmapToPublicGallery(context: Context, bitmap: Bitmap): String {
+    val fileName = "ArtTherapy_${System.currentTimeMillis()}.png"
+    var uri: Uri? = null
+    val contentResolver = context.contentResolver
+
+    // Android 10 va undan yuqori versiyalar uchun (Scoped Storage)
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // DCIM papkasi ichida ArtTherapy nomli papka ochadi
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/ArtTherapy")
+        }
+    }
+
+    return try {
+        uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+        uri?.let {
+            val outputStream: OutputStream? = contentResolver.openOutputStream(it)
+            outputStream?.use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            }
+            "Rasm Galereyaga saqlandi (DCIM)"
+        } ?: "Xatolik: Uri yaratilmadi"
+    } catch (e: Exception) {
+        e.printStackTrace()
+        "Saqlashda xatolik: ${e.message}"
+    }
+}
+
+// Picture-dan Bitmap yaratish funksiyasi
+fun createBitmapFromPicture(picture: android.graphics.Picture): Bitmap {
+    val bitmap = Bitmap.createBitmap(picture.width.coerceAtLeast(1), picture.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    canvas.drawPicture(picture)
+    return bitmap
+}
 
 // Recomposition uchun yordamchi class
 class MotionEvent(val x: Float, val y: Float) {
     companion object {
         fun create(x: Float, y: Float) = MotionEvent(x, y)
     }
+
 }
 
 @Composable
