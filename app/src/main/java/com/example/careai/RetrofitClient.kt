@@ -2,24 +2,40 @@ package com.example.careai
 
 import CareAiApiService
 import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "https://epimeric-unmovable-toshiko.ngrok-free.dev/"
+    // 1. URL manzillarini ajratib olamiz
+    private const val MY_BACKEND_URL = "https://epimeric-unmovable-toshiko.ngrok-free.dev/"
+    private const val OPENAI_URL = "https://api.openai.com/"
 
-    // Timeout vaqtlarini sozlash
+    // 2. Umumiy OkHttpClient (Ikkala servis uchun ham bitta client yetarli)
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS) // Serverga ulanish kutish vaqti
-        .readTimeout(60, TimeUnit.SECONDS)    // Ma'lumotni o'qish kutish vaqti
-        .writeTimeout(60, TimeUnit.SECONDS)   // Faylni yuborish kutish vaqti
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
+    // 3. Sizning mavjud backend instansiyangiz (Login/Register uchun)
     val instance: CareAiApiService by lazy {
-        retrofit2.Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(okHttpClient) // Sozlangan clientni ulaymiz
-            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+        Retrofit.Builder()
+            .baseUrl(MY_BACKEND_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(CareAiApiService::class.java)
+    }
+
+    // 4. YANGI: OpenAI instansiyasi (STT, Chat, TTS uchun)
+    // Bu yerda siz tashlagan OpenAiService interfeysidan foydalanamiz
+    val openAiInstance: OpenAiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(OPENAI_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(OpenAiService::class.java)
     }
 }
