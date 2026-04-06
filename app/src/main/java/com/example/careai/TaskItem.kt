@@ -1,6 +1,6 @@
 package com.example.careai
 
-data class TaskItem(
+data class askItem(
     val id: Long = System.currentTimeMillis(),
     var taskText: String = "",
     var time: String = "00:00",

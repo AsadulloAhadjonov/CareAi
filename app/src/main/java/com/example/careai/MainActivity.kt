@@ -13,7 +13,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.PathMeasure
 import android.graphics.Picture
+import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.media.audiofx.Visualizer
@@ -93,6 +96,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
@@ -101,6 +105,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
@@ -117,6 +122,7 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -165,11 +171,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -222,8 +231,17 @@ val SecondaryPink = Color(0xFFFFD8E7)
 val Primary = Color(0xFF5252FF)
 val OnSurface = Color(0xFF2F3334)
 val OnSurfaceVariant = Color(0xFF5B6061)
-private val API_KEY = "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"
 
+// Ballarni saqlash uchun model
+data class AnalysisPoint(
+    val sectionName: String, // Masalan: "Music", "Colors", "Drawing"
+    val score: Int,          // +1 yoki -1
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+// ViewModel ichida
+var analysisHistory = mutableStateListOf<AnalysisPoint>()
+private val API_KEY = "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"
 
 class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
@@ -337,35 +355,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun sendLocalNotification(context: Context, title: String, message: String) {
-    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    val channelId = "settings_channel"
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val channel = NotificationChannel(
-            "settings_channel", // Bu ID quyidagi Builder'dagi bilan bir xil bo'lishi kerak
-            "Settings Notifications",
-            NotificationManager.IMPORTANCE_HIGH // SHU YERNI TEKSHIRING
-        )
-        notificationManager.createNotificationChannel(channel)
-    }
-
-    val notification = NotificationCompat.Builder(context, channelId)
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
-        .setContentTitle(title)
-        .setContentText(message)
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
-        .setAutoCancel(true)
-        .build()
-
-    notificationManager.notify(System.currentTimeMillis().toInt(), notification)
-}
-
 // --- VERTICAL PAGER SYSTEM ---
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainVerticalPager(onLogout: () -> Unit = {}, context: Context) {
-    val pagerState = rememberPagerState(pageCount = { 5 })
+    val pagerState = rememberPagerState(pageCount = { 6 })
     val coroutineScope = rememberCoroutineScope()
     var isAllowedToScroll by remember { mutableStateOf(false) }
     var showConsent by remember { mutableStateOf(false) }
@@ -394,10 +388,17 @@ fun MainVerticalPager(onLogout: () -> Unit = {}, context: Context) {
 
                 3 -> ListenMusicScreen()
 
-                4 -> CreativeTestScreen(
+                4 -> CreativeTestScreen(onShowResult = {
+                    coroutineScope.launch { pagerState.animateScrollToPage(5) }
+                })
+
+                5 -> ResultScreen(
+                    history = analysisHistory, // Barcha bosqichlardan yig'ilgan +1/-1 ballar ro'yxati
                     onBack = {
+                        // Foydalanuvchini bosh sahifaga qaytarish va ma'lumotlarni tozalash
+                        analysisHistory.clear()
                         coroutineScope.launch {
-                            pagerState.animateScrollToPage(3)
+                            pagerState.animateScrollToPage(0)
                         }
                     }
                 )
@@ -549,7 +550,7 @@ fun analyzeMultipleDrawings(
 }
 
 fun DrawScope.drawInitialTriangle(color: Color) {
-    val path = androidx.compose.ui.graphics.Path().apply {
+    val path = Path().apply {
         moveTo(size.width / 2f, size.height / 3f)      // Yuqori uch
         lineTo(size.width / 4f, size.height * 2/3f)    // Chap pastki uch
         lineTo(size.width * 3/4f, size.height * 2/3f)  // O'ng pastki uch
@@ -595,18 +596,17 @@ fun TestGridItem(bitmap: Bitmap?, onClick: () -> Unit, modifier: Modifier) {
 }
 
 @Composable
-fun CreativeTestScreen(onBack: () -> Unit) {
+fun CreativeTestScreen(onShowResult: () -> Unit) {
     val scope = rememberCoroutineScope()
     val api = remember { RetrofitClient.openAiInstance }
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
-    // 9 ta rasm uchun konteyner (Bitmap saqlash uchun)
     val drawings = remember { mutableStateMapOf<Int, Bitmap?>() }
     var currentEditingIndex by remember { mutableStateOf<Int?>(null) }
     var apiResponse by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // AI javob berganda scroll qilish
     LaunchedEffect(apiResponse) {
         if (apiResponse != null) {
             scrollState.animateScrollTo(scrollState.maxValue)
@@ -614,7 +614,6 @@ fun CreativeTestScreen(onBack: () -> Unit) {
     }
 
     if (currentEditingIndex != null) {
-        // Chizish oynasi (alohida komponent)
         DrawingCanvasOverlay(
             index = currentEditingIndex!!,
             onSave = { bitmap ->
@@ -624,7 +623,7 @@ fun CreativeTestScreen(onBack: () -> Unit) {
             onCancel = { currentEditingIndex = null }
         )
     } else {
-        Box(modifier = Modifier.fillMaxSize().background(BackgroundColor)) {
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -640,12 +639,12 @@ fun CreativeTestScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // 3x3 Jadval
-                repeat(3) { rowIndex ->
+                for (rowIndex in 0 until 3) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        repeat(3) { colIndex ->
+                        for (colIndex in 0 until 3) {
                             val index = rowIndex * 3 + colIndex
                             TestGridItem(
                                 bitmap = drawings[index],
@@ -659,48 +658,95 @@ fun CreativeTestScreen(onBack: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Tahlil natijasi
+                // AI JAVOBI (Hech qanday ramkasiz, faqat matn va fon)
                 AnimatedVisibility(visible = apiResponse != null) {
                     Text(
                         text = apiResponse ?: "",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White.copy(0.6f), RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(0.8f), RoundedCornerShape(20.dp))
                             .padding(16.dp),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        fontSize = 15.sp
                     )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Tugatish tugmasi
-                Button(
-                    onClick = {
-                        isLoading = true
-                        analyzeMultipleDrawings(drawings, scope, api) { result ->
-                            apiResponse = result
-                            isLoading = false
+                // TUGMALAR MANTIQI
+                if (apiResponse == null) {
+                    Button(
+                        onClick = {
+                            // 1. Faqat chizilgan rasmlarni ajratib olish (AI uchun)
+                            val validDrawings = mutableMapOf<Int, Bitmap>()
+
+                            // 2. 9 ta katakni bittalab tekshirish (Siz aytgan qat'iy mantiq)
+                            for (i in 0 until 9) {
+                                val bitmap = drawings[i]
+                                if (bitmap != null) {
+                                    validDrawings[i] = bitmap
+                                    analysisHistory.add(AnalysisPoint("Drawing_$i", 1)) // Chizilgan +1
+                                } else {
+                                    analysisHistory.add(AnalysisPoint("Drawing_$i", -1)) // Chizilmagan -1
+                                }
+                            }
+
+                            if (validDrawings.isEmpty()) {
+                                Toast.makeText(context, "Kamida bitta shaklni chizing!", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            isLoading = true
+
+                            // AI ga faqat haqiqatda chizilgan rasmlarni yuboramiz
+                            analyzeMultipleDrawings(validDrawings, scope, api) { result ->
+                                apiResponse = result
+                                isLoading = false
+                                analyzeAISentiment(result)
+                                Toast.makeText(context, "Tahlil yakunlandi", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.height(56.dp).width(220.dp).shadow(8.dp, CircleShape),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        } else {
+                            Text("Testni yakunlash", color = Color.White)
                         }
-                    },
-                    modifier = Modifier.height(56.dp).width(220.dp).shadow(8.dp, CircleShape),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple),
-                    enabled = !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp), // Hajmi
-                            color = Color.White,            // Rangi
-                            strokeWidth = 2.dp              // Chiziq qalinligi
-                        )
-                    } else {
-                        Text("Testni yakunlash")
+                    }
+                } else {
+                    Button(
+                        onClick = onShowResult,
+                        modifier = Modifier.height(56.dp).width(240.dp).shadow(8.dp, CircleShape),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color(0xFF6200EE))
+                    ) {
+                        Text("Umumiy natijani ko'rish", color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.TrendingUp, null, tint = Color(0xFF6200EE))
                     }
                 }
+
                 Spacer(modifier = Modifier.height(50.dp))
             }
         }
     }
+}
+
+fun analyzeAISentiment(response: String) {
+    val positiveKeywords = listOf("yaxshi", "xursand", "ijobiy", "tinch", "normal")
+    val negativeKeywords = listOf("yomon", "xavotir", "tushkun", "stress", "salbiy")
+
+    val score = when {
+        positiveKeywords.any { response.lowercase().contains(it) } -> 1
+        negativeKeywords.any { response.lowercase().contains(it) } -> -1
+        else -> 0
+    }
+    analysisHistory.add(AnalysisPoint("AI_Analysis", score))
 }
 
 @Composable
@@ -710,8 +756,8 @@ fun DrawingCanvasOverlay(
     onCancel: () -> Unit
 ) {
     val paths = remember { mutableStateListOf<ColoredPath>() }
-    var currentPath by remember { mutableStateOf<androidx.compose.ui.graphics.Path?>(null) }
-    val picture = remember { android.graphics.Picture() }
+    var currentPath by remember { mutableStateOf<Path?>(null) }
+    val picture = remember { Picture() }
     val redrawTrigger = remember { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White).statusBarsPadding()) {
@@ -729,7 +775,7 @@ fun DrawingCanvasOverlay(
             Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp).border(1.dp, Color.LightGray, RoundedCornerShape(16.dp))) {
                 Canvas(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                     detectDragGestures(
-                        onDragStart = { offset -> currentPath = androidx.compose.ui.graphics.Path().apply { moveTo(offset.x, offset.y) } },
+                        onDragStart = { offset -> currentPath = Path().apply { moveTo(offset.x, offset.y) } },
                         onDrag = { change, _ -> change.consume(); currentPath?.lineTo(change.position.x, change.position.y); redrawTrigger.intValue++ },
                         onDragEnd = { currentPath?.let { paths.add(ColoredPath(it, Color.Black)) }; currentPath = null }
                     )
@@ -737,7 +783,7 @@ fun DrawingCanvasOverlay(
                     redrawTrigger.intValue.let { }
                     val pictureCanvas = androidx.compose.ui.graphics.Canvas(picture.beginRecording(size.width.toInt(), size.height.toInt()))
 
-                    val drawContent: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit = {
+                    val drawContent: DrawScope.() -> Unit = {
                         drawRect(Color.White) // Oq fon
 
                         // --- DIQQAT: Boshlang'ich uchburchakni chizamiz ---
@@ -749,7 +795,7 @@ fun DrawingCanvasOverlay(
                     }
 
                     drawContent()
-                    androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(this, layoutDirection, pictureCanvas, size) { drawContent() }
+                    CanvasDrawScope().draw(this, layoutDirection, pictureCanvas, size) { drawContent() }
                     picture.endRecording()
                 }
             }
@@ -779,6 +825,18 @@ fun ListenMusicScreen() {
     val mediaPlayer = remember {
         MediaPlayer.create(context, R.raw.meditation_music).apply {
             isLooping = true
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (true) {
+                delay(40000) // 40 soniya kutish
+                analysisHistory.add(AnalysisPoint("Music", 1))
+            }
+        } else {
+            // Agar 40 soniya bo'lmasdan to'xtatsa
+            analysisHistory.add(AnalysisPoint("Music", -1))
         }
     }
 
@@ -1553,11 +1611,11 @@ fun SanctuaryApp(onMicClick: () -> Unit, onSettings: () -> Unit, context: Contex
             .navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
             TopBar(onSettings = onSettings, userName =  displayName)
             Spacer(modifier = Modifier.weight(0.5f))
-            AnimatedVoiceAvatar(onMicClick)
+            AnimatedVoiceAvatar()
             Spacer(modifier = Modifier.height(48.dp))
             Spacer(modifier = Modifier.height(40.dp))
             Spacer(modifier = Modifier.weight(1f))
-            ActionButtons()
+            ActionButtons(onMicClick)
             Text("SIZNING MAXFIYLIGINGIZ BIZ TOMONIMIZDAN TAMINLANADI!", style = MaterialTheme.typography.labelSmall.copy(color = OnSurfaceVariant.copy(0.4f)), modifier = Modifier.padding(bottom = 32.dp))
         }
     }
@@ -1688,6 +1746,7 @@ fun ColorSelectionScreen(onNextPage: () -> Unit) {
                             startColorAnalysis(selectedIds, scope, apiKey, api) { result ->
                                 apiResponse = result
                                 isLoading = false
+                                analyzeAISentiment(result)
                             }
                         },
                         modifier = Modifier
@@ -2049,6 +2108,7 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
                                 analyzeArtTherapy(bitmap, scope, apiKey, api) { result ->
                                     apiResponse = result
                                     isLoading = false
+                                    analyzeAISentiment(result)
                                 }
                             },
                             modifier = Modifier.height(56.dp).width(220.dp).shadow(8.dp, CircleShape),
@@ -2175,36 +2235,6 @@ fun analyzeArtTherapy(
     }
 }
 
-fun saveBitmapToPublicGallery(context: Context, bitmap: Bitmap): String {
-    val fileName = "ArtTherapy_${System.currentTimeMillis()}.png"
-    var uri: Uri? = null
-    val contentResolver = context.contentResolver
-
-    // Android 10 va undan yuqori versiyalar uchun (Scoped Storage)
-    val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // DCIM papkasi ichida ArtTherapy nomli papka ochadi
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/ArtTherapy")
-        }
-    }
-
-    return try {
-        uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-        uri?.let {
-            val outputStream: OutputStream? = contentResolver.openOutputStream(it)
-            outputStream?.use { stream ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-            }
-            "Rasm Galereyaga saqlandi (DCIM)"
-        } ?: "Xatolik: Uri yaratilmadi"
-    } catch (e: Exception) {
-        e.printStackTrace()
-        "Saqlashda xatolik: ${e.message}"
-    }
-}
-
 // Picture-dan Bitmap yaratish funksiyasi
 fun createBitmapFromPicture(picture: Picture): Bitmap {
     val bitmap = Bitmap.createBitmap(picture.width.coerceAtLeast(1), picture.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
@@ -2214,7 +2244,7 @@ fun createBitmapFromPicture(picture: Picture): Bitmap {
 }
 
 @Composable
-fun AnimatedVoiceAvatar(onMicClick: () -> Unit) {
+fun AnimatedVoiceAvatar() {
     val infiniteTransition = rememberInfiniteTransition("")
 
     val ts by infiniteTransition.animateFloat(
@@ -2264,9 +2294,6 @@ fun AnimatedVoiceAvatar(onMicClick: () -> Unit) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(350.dp)
-            .clickable {
-                onMicClick()
-            }// Umumiy konteyner
     ) {
         // 1. GLOW (NUR) - Endi Canvas bilan chizamiz
         Canvas(modifier = Modifier.size(250.dp)) {
@@ -2300,7 +2327,7 @@ fun AnimatedVoiceAvatar(onMicClick: () -> Unit) {
 }
 
 @Composable
-fun ActionButtons() {
+fun ActionButtons(onMickClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -2520,6 +2547,7 @@ fun ActionButtons() {
 
                     val gptResponse = api.getChatResponse("Bearer $apiKey", chatRequest)
                     val aiReply = gptResponse.choices[0].message.content
+                    analyzeAISentiment(aiReply)
                     val styledReply = when {
                         aiReply.contains("xavotir", true) -> "Tinch va taskin beruvchi ohangda: $aiReply"
                         aiReply.contains("xafa", true) -> "Yumshoq va empatiya bilan: $aiReply"
@@ -2649,7 +2677,7 @@ fun ActionButtons() {
 
         Spacer(modifier = Modifier.width(32.dp))
 
-        SecondaryButton(Icons.Default.Keyboard)
+        SecondaryButton2(Icons.Default.PlayArrow, onMickClick)
     }
 
     // Xotirani tozalash
@@ -2785,9 +2813,213 @@ fun TopBar(
     }
 }
 
+fun saveBitmapToGallery(context: Context, bitmap: Bitmap) {
+    val filename = "CareAI_Result_${System.currentTimeMillis()}.png"
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/CareAI")
+        }
+    }
+
+    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+    uri?.let {
+        context.contentResolver.openOutputStream(it).use { outputStream ->
+            if (outputStream != null) {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                Toast.makeText(context, "Diagramma galereyaga saqlandi!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
+    val animationProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        animationProgress.animateTo(1f, tween(2000, easing = FastOutSlowInEasing))
+    }
+
+    val cumulativeScores = remember(history) {
+        val scores = mutableListOf<Int>()
+        var currentSum = 5
+        scores.add(currentSum)
+        history.forEach { point ->
+            currentSum = (currentSum + point.score).coerceIn(0, 10)
+            scores.add(currentSum)
+        }
+        scores
+    }
+
+    // Raqamlar uchun chap tomondan joy ajratamiz
+    val leftPaddingForLabels = 40.dp
+
+    Canvas(modifier = Modifier
+        .fillMaxSize()
+        .padding(20.dp)
+    ) {
+        val labelsWidthPx = leftPaddingForLabels.toPx()
+        val usableWidth = size.width - labelsWidthPx
+        val usableHeight = size.height
+        val widthStep = usableWidth / (cumulativeScores.size - 1).coerceAtLeast(1)
+        val yScale = usableHeight / 10
+
+        // --- 1. RASMGA OLISH (PICTURE RECORDING) ---
+        val nativeCanvas = picture.beginRecording(size.width.toInt(), size.height.toInt())
+        val drawScope = CanvasDrawScope()
+
+        // Bu funksiya chizish amallarini ham Picture'ga, ham ekranga chiqarishga yordam beradi
+        val drawBlock: DrawScope.() -> Unit = {
+            // Fon grid chiziqlari
+            for (i in 0..10) {
+                val y = usableHeight - (i * yScale)
+                drawLine(
+                    color = if (i == 5) Color.Gray.copy(0.4f) else Color.LightGray.copy(0.1f),
+                    start = Offset(labelsWidthPx, y), // Raqamlardan keyin boshlanadi
+                    end = Offset(size.width, y),
+                    strokeWidth = if (i == 5) 3f else 1f
+                )
+            }
+
+            // Trend chizig'i
+            val path = Path()
+            cumulativeScores.forEachIndexed { index, score ->
+                val x = labelsWidthPx + (index * widthStep)
+                val y = usableHeight - (score * yScale)
+                if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+
+            drawPath(
+                path = path,
+                color = Color(0xFF6200EE),
+                style = Stroke(
+                    width = 8f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round,
+                    pathEffect = PathEffect.dashPathEffect(
+                        intervals = floatArrayOf(pathMeasure(path).length, pathMeasure(path).length),
+                        phase = pathMeasure(path).length * (1f - animationProgress.value)
+                    )
+                )
+            )
+        }
+
+        // 1a. Picture'ga yozamiz (Saqlash uchun)
+        drawScope.draw(
+            density = this,
+            layoutDirection = layoutDirection,
+            canvas = androidx.compose.ui.graphics.Canvas(nativeCanvas),
+            size = size,
+            block = drawBlock
+        )
+        picture.endRecording()
+
+        // 1b. Ekranga chizamiz (Foydalanuvchi ko'rishi uchun)
+        drawBlock()
+
+        // --- 2. RAQAMLARNI CHIZISH (CHAP TOMONDA) ---
+        for (i in 0..10) {
+            val y = usableHeight - (i * yScale)
+            drawIntoCanvas { canvas ->
+                val paint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.GRAY
+                    textSize = 10.sp.toPx()
+                    textAlign = android.graphics.Paint.Align.RIGHT
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                // Raqamni chiziqdan 15px chaproqda chizamiz
+                canvas.nativeCanvas.drawText(
+                    i.toString(),
+                    labelsWidthPx - 15f,
+                    y + 12f,
+                    paint
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ResultScreen(history: List<AnalysisPoint>, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val picture = remember { Picture() }
+    val scrollState = rememberScrollState() // Scroll uchun holat
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .verticalScroll(scrollState) // Tarkib sig'masa scroll bo'ladi
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text("Sizning Ruhiy Holatingiz", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Diagramma uchun maxsus konteyner
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(350.dp) // Balandlikni biroz oshirdik
+                .background(Color(0xFFF8F9FA), RoundedCornerShape(24.dp))
+                .padding(bottom = 16.dp) // Tugma bilan oraliqni saqlash uchun
+        ) {
+            AnimatedTrendChart(history = history, picture = picture)
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        // Yuklab olish tugmasi
+        Button(
+            onClick = {
+                val bitmap = createBitmapFromPicture(picture)
+                saveBitmapToGallery(context, bitmap)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .shadow(4.dp, RoundedCornerShape(16.dp)),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEADDFF))
+        ) {
+            Icon(Icons.Default.Download, contentDescription = null, tint = Color(0xFF6200EE))
+            Spacer(Modifier.width(10.dp))
+            Text("Diagrammani yuklab olish", color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(onClick = onBack) {
+            Text("Orqaga qaytish", color = Color.Gray)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp)) // Pastki qismda bo'shliq
+    }
+}
+
+// Path uzunligini o'lchash uchun yordamchi
+fun pathMeasure(path: Path): PathMeasure {
+    val androidPath = path.asAndroidPath()
+    return PathMeasure(androidPath, false)
+}
+
 @Composable
 fun SecondaryButton(icon: ImageVector) {
     Surface(modifier = Modifier.size(60.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.4f), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = OnSurfaceVariant, modifier = Modifier.size(28.dp)) }
+    }
+}
+
+@Composable
+fun SecondaryButton2(icon: ImageVector, onMickClick: () -> Unit) {
+    Surface(modifier = Modifier.size(60.dp).clickable{
+        onMickClick()
+    }, shape = CircleShape, color = Color.White.copy(alpha = 0.4f), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))) {
+        Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = OnSurfaceVariant, modifier = Modifier.size(28.dp)
+            ) }
     }
 }
