@@ -36,6 +36,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutSine
@@ -221,7 +222,6 @@ import java.io.OutputStream
 import java.util.Calendar
 import java.util.Locale
 
-// --- RANG PALITRASI ---
 val PrimaryPurple = Color(0xFF0057FF)
 val PrimaryContainer = Color(0xFF2B83FF)
 val BackgroundColor = Color(0xFFFAF8FF)
@@ -232,14 +232,12 @@ val Primary = Color(0xFF5252FF)
 val OnSurface = Color(0xFF2F3334)
 val OnSurfaceVariant = Color(0xFF5B6061)
 
-// Ballarni saqlash uchun model
 data class AnalysisPoint(
-    val sectionName: String, // Masalan: "Music", "Colors", "Drawing"
-    val score: Int,          // +1 yoki -1
+    val sectionName: String,
+    val score: Int,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-// ViewModel ichida
 var analysisHistory = mutableStateListOf<AnalysisPoint>()
 private val API_KEY = "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"
 
@@ -249,11 +247,10 @@ class MainActivity : ComponentActivity() {
     ) { isGranted: Boolean -> }
 
     private val requestPermissionLauncherMic = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions() // Multiple qilamiz
+        ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
         if (!audioGranted) {
-            // Foydalanuvchiga mikrofon kerakligini tushuntirish mumkin
         }
     }
 
@@ -268,7 +265,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Ruxsatnomalar va Kanallarni sozlash
         askNotificationPermission()
         createNotificationChannel(this)
         enableEdgeToEdge()
@@ -279,16 +275,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CareAiTheme {
-                // 1. Splash Screen holati
                 var showSplash by remember { mutableStateOf(true) }
 
                 if (showSplash) {
-                    // Ma'lumotlar yuklanayotganda Splash ko'rsatiladi
                     SplashScreen(onLoadingComplete = {
                         showSplash = false
                     })
                 } else {
-                    // 2. Ma'lumotlar tayyor bo'lgach asosiy Navigatsiya ishga tushadi
                     val navController = rememberNavController()
                     val startScreen = if (token != null) "main_pager" else "oyna_a"
 
@@ -335,12 +328,10 @@ class MainActivity : ComponentActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
-                // Agar ruxsat berilmagan bo'lsa, so'raydi
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }
-    // MainActivity onCreate ichida chaqirib qo'ying
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Vazifa eslatmalari"
@@ -355,7 +346,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- VERTICAL PAGER SYSTEM ---
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainVerticalPager(onLogout: () -> Unit = {}, context: Context) {
@@ -393,9 +383,8 @@ fun MainVerticalPager(onLogout: () -> Unit = {}, context: Context) {
                 })
 
                 5 -> ResultScreen(
-                    history = analysisHistory, // Barcha bosqichlardan yig'ilgan +1/-1 ballar ro'yxati
+                    history = analysisHistory,
                     onBack = {
-                        // Foydalanuvchini bosh sahifaga qaytarish va ma'lumotlarni tozalash
                         analysisHistory.clear()
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(0)
@@ -424,7 +413,6 @@ fun MainVerticalPager(onLogout: () -> Unit = {}, context: Context) {
             )
         }
 
-        // MainVerticalPager ichida...
         if (showSettings) {
             SettingsScreen(
                 onClose = { showSettings = false },
@@ -438,7 +426,6 @@ fun MainVerticalPager(onLogout: () -> Unit = {}, context: Context) {
 fun SplashScreen(onLoadingComplete: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "SplashAnimation")
 
-    // 1. Logo uchun kattalashib-kichiklashish (Pulse) effekti
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.9f,
         targetValue = 1.1f,
@@ -449,7 +436,6 @@ fun SplashScreen(onLoadingComplete: () -> Unit) {
         label = "LogoScale"
     )
 
-    // 2. Orqa fondagi "Nafas olish" (Blur/Alpha) effekti
     val blurAlpha by infiniteTransition.animateFloat(
         initialValue = 0.2f,
         targetValue = 0.6f,
@@ -460,19 +446,17 @@ fun SplashScreen(onLoadingComplete: () -> Unit) {
         label = "BlurAlpha"
     )
 
-    // Ma'lumotlarni yuklashni simulyatsiya qilish (masalan, 3 soniya)
     LaunchedEffect(Unit) {
-        delay(3000) // Haqiqiy API chaqiruvlari tugaguncha kutish mumkin
+        delay(3000)
         onLoadingComplete()
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundColor), // Sizning loyihangizdagi fon rangi
+            .background(BackgroundColor),
         contentAlignment = Alignment.Center
     ) {
-        // Orqa fondagi nafas oluvchi blur effekt
         Box(
             modifier = Modifier
                 .size(300.dp)
@@ -486,12 +470,11 @@ fun SplashScreen(onLoadingComplete: () -> Unit) {
                         colors = listOf(PrimaryPurple.copy(alpha = 0.4f), Color.Transparent)
                     )
                 )
-                .blur(40.dp) // Blur effekti
+                .blur(40.dp)
         )
 
-        // Asosiy Logo
         Image(
-            painter = painterResource(id = R.drawable.logo), // Logongizni qo'ying
+            painter = painterResource(id = R.drawable.logo),
             contentDescription = "Logo",
             modifier = Modifier
                 .size(150.dp)
@@ -514,7 +497,6 @@ fun analyzeMultipleDrawings(
             val filledIndices = drawings.filter { it.value != null }.keys
             val emptyIndices = (0..8).filter { !filledIndices.contains(it) }
 
-            // Faqat chizilgan rasmlarni yuboramiz
             val contentList = mutableListOf<Any>()
 
             var promptText = "Foydalanuvchi 9 ta katakdan iborat kreativlik testini topshirdi.\n"
@@ -529,7 +511,6 @@ fun analyzeMultipleDrawings(
 
             contentList.add(TextContent(text = promptText))
 
-            // Rasmlarni qo'shish
             drawings.forEach { (index, bitmap) ->
                 bitmap?.let {
                     val base64 = bitmapToBase64(it)
@@ -551,21 +532,18 @@ fun analyzeMultipleDrawings(
 
 fun DrawScope.drawInitialTriangle(color: Color) {
     val path = Path().apply {
-        moveTo(size.width / 2f, size.height / 3f)      // Yuqori uch
-        lineTo(size.width / 4f, size.height * 2/3f)    // Chap pastki uch
-        lineTo(size.width * 3/4f, size.height * 2/3f)  // O'ng pastki uch
-        close() // Burchaklarni birlashtirish
+        moveTo(size.width / 2f, size.height / 3f)
+        lineTo(size.width / 4f, size.height * 2/3f)
+        lineTo(size.width * 3/4f, size.height * 2/3f)
+        close()
     }
-    // Shaffofroq chiziq bilan chizamiz
     drawPath(path, color, style = Stroke(width = 3f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)))
 }
 
 fun bitmapToBase64(bitmap: Bitmap): String {
     val outputStream = ByteArrayOutputStream()
-    // Rasmni JPEG formatida siqamiz (hajmi kichik bo'lishi uchun 80% sifatda)
     bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
     val byteArray = outputStream.toByteArray()
-    // Baytlarni Base64 stringga aylantiramiz
     return Base64.encodeToString(byteArray, Base64.NO_WRAP)
 }
 
@@ -587,7 +565,6 @@ fun TestGridItem(bitmap: Bitmap?, onClick: () -> Unit, modifier: Modifier) {
                 modifier = Modifier.fillMaxSize().padding(4.dp)
             )
         } else {
-            // Boshlang'ich shakl (har bir katakda turlicha bo'lishi mumkin)
             Canvas(modifier = Modifier.size(20.dp)) {
                 drawCircle(color = Color.LightGray, style = Stroke(width = 2f))
             }
@@ -638,7 +615,6 @@ fun CreativeTestScreen(onShowResult: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 3x3 Jadval
                 for (rowIndex in 0 until 3) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -658,7 +634,6 @@ fun CreativeTestScreen(onShowResult: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // AI JAVOBI (Hech qanday ramkasiz, faqat matn va fon)
                 AnimatedVisibility(visible = apiResponse != null) {
                     Text(
                         text = apiResponse ?: "",
@@ -673,21 +648,18 @@ fun CreativeTestScreen(onShowResult: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // TUGMALAR MANTIQI
                 if (apiResponse == null) {
                     Button(
                         onClick = {
-                            // 1. Faqat chizilgan rasmlarni ajratib olish (AI uchun)
                             val validDrawings = mutableMapOf<Int, Bitmap>()
 
-                            // 2. 9 ta katakni bittalab tekshirish (Siz aytgan qat'iy mantiq)
                             for (i in 0 until 9) {
                                 val bitmap = drawings[i]
                                 if (bitmap != null) {
                                     validDrawings[i] = bitmap
-                                    analysisHistory.add(AnalysisPoint("Drawing_$i", 1)) // Chizilgan +1
+                                    analysisHistory.add(AnalysisPoint("Drawing_$i", 1))
                                 } else {
-                                    analysisHistory.add(AnalysisPoint("Drawing_$i", -1)) // Chizilmagan -1
+                                    analysisHistory.add(AnalysisPoint("Drawing_$i", -1))
                                 }
                             }
 
@@ -698,7 +670,6 @@ fun CreativeTestScreen(onShowResult: () -> Unit) {
 
                             isLoading = true
 
-                            // AI ga faqat haqiqatda chizilgan rasmlarni yuboramiz
                             analyzeMultipleDrawings(validDrawings, scope, api) { result ->
                                 apiResponse = result
                                 isLoading = false
@@ -762,7 +733,6 @@ fun DrawingCanvasOverlay(
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White).statusBarsPadding()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Tepadagi panel (Yopish, Sarlavha, Tayyor)
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onCancel) { Icon(Icons.Default.Close, null) }
                 Text("${index + 1}-shaklni to'ldiring", fontWeight = FontWeight.Bold)
@@ -771,7 +741,6 @@ fun DrawingCanvasOverlay(
                 }
             }
 
-            // Chizish maydoni
             Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp).border(1.dp, Color.LightGray, RoundedCornerShape(16.dp))) {
                 Canvas(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                     detectDragGestures(
@@ -784,12 +753,10 @@ fun DrawingCanvasOverlay(
                     val pictureCanvas = androidx.compose.ui.graphics.Canvas(picture.beginRecording(size.width.toInt(), size.height.toInt()))
 
                     val drawContent: DrawScope.() -> Unit = {
-                        drawRect(Color.White) // Oq fon
+                        drawRect(Color.White)
 
-                        // --- DIQQAT: Boshlang'ich uchburchakni chizamiz ---
                         drawInitialTriangle(Color.LightGray.copy(alpha = 0.5f))
 
-                        // Foydalanuvchi chizayotgan chiziqlar (qora rangda)
                         paths.forEach { drawPath(it.path, Color.Black, style = Stroke(width = 5f, cap = StrokeCap.Round)) }
                         currentPath?.let { drawPath(it, Color.Black, style = Stroke(width = 5f, cap = StrokeCap.Round)) }
                     }
@@ -804,13 +771,13 @@ fun DrawingCanvasOverlay(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.GINGERBREAD)
 @Composable
 fun ListenMusicScreen() {
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(false) }
     var musicPulse by remember { mutableStateOf(1f) }
 
-    // 1. Ruxsatnomani tekshirish
     var hasPermission by remember {
         mutableStateOf(
             context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -821,7 +788,6 @@ fun ListenMusicScreen() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted -> hasPermission = isGranted }
 
-    // 2. MediaPlayer-ni yaratish
     val mediaPlayer = remember {
         MediaPlayer.create(context, R.raw.meditation_music).apply {
             isLooping = true
@@ -831,16 +797,14 @@ fun ListenMusicScreen() {
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
             while (true) {
-                delay(40000) // 40 soniya kutish
+                delay(40000)
                 analysisHistory.add(AnalysisPoint("Music", 1))
             }
         } else {
-            // Agar 40 soniya bo'lmasdan to'xtatsa
             analysisHistory.add(AnalysisPoint("Music", -1))
         }
     }
 
-    // 3. Visualizer va Lifecycle boshqaruvi
     DisposableEffect(hasPermission) {
         var visualizer: Visualizer? = null
         if (hasPermission) {
@@ -851,7 +815,6 @@ fun ListenMusicScreen() {
                         override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
                             if (isPlaying && waveform != null) {
                                 val average = waveform.map { Math.abs(it.toInt()) }.average()
-                                // Ritm sezgirligi (1.0f dan 1.8f gacha)
                                 musicPulse = 1f + (average.toFloat() / 128f) * 1.5f
                             } else {
                                 musicPulse = 1f
@@ -871,15 +834,12 @@ fun ListenMusicScreen() {
         }
     }
 
-    // UI QISMI
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Fon (Sizdagi mavjud AtmosphericAura)
         AtmosphericAura()
 
-        // 4. Atrof qorayishi animatsiyasi (2 soniya davom etadi)
         val darknessAlpha by animateFloatAsState(
             targetValue = if (isPlaying) 0.85f else 0f,
             animationSpec = tween(2000, easing = LinearOutSlowInEasing),
@@ -892,12 +852,10 @@ fun ListenMusicScreen() {
         )
 
         if (!hasPermission) {
-            // Ruxsat so'rash tugmasi
             Button(onClick = { launcher.launch(Manifest.permission.RECORD_AUDIO) }) {
                 Text("Ritm effektini yoqish uchun ruxsat bering")
             }
         } else {
-            // 5. Musiqaga moslanuvchi xalqalar
             if (isPlaying) {
                 repeat(4) { index ->
                     val animatedScale by animateFloatAsState(
@@ -923,7 +881,6 @@ fun ListenMusicScreen() {
                 }
             }
 
-            // 6. Markaziy Play/Pause tugmasi
             Box(
                 modifier = Modifier
                     .size(100.dp)
@@ -955,7 +912,6 @@ fun ListenMusicScreen() {
             }
         }
 
-        // Pastki yozuv
         if (isPlaying) {
             Text(
                 text = "Musiqa ritmiga mos nafas oling",
@@ -975,7 +931,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("CareAI_Prefs", Context.MODE_PRIVATE) }
 
-    // Foydalanuvchi ma'lumotlarini SharedPrefs dan olish
     val userName = remember { prefs.getString("user_name", "Foydalanuvchi") ?: "Foydalanuvchi" }
     val userEmail =
         remember { prefs.getString("user_email", "Email ko'rsatilmagan") ?: "Email ko'rsatilmagan" }
@@ -994,7 +949,7 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF8F9FE) // BackgroundColor o'rniga
+        color = Color(0xFFF8F9FE)
     ) {
         Column(
             modifier = Modifier
@@ -1004,7 +959,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- YUQORI PANEL ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1036,7 +990,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                     .verticalScroll(rememberScrollState())
             ) {
 
-                // --- AKKAUNT VA PROFIL ---
                 Text(
                     text = "Hisob va Profil",
                     fontSize = 22.sp,
@@ -1054,7 +1007,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                         .padding(20.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // Profil ma'lumotlari (Edit o'rniga)
                         SettingsItem(
                             icon = Icons.Default.Person,
                             title = "Profil ma'lumotlari",
@@ -1069,7 +1021,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                             }
                         }
 
-                        // Bildirishnomalar
                         SettingsItem(
                             icon = Icons.Default.NotificationsActive,
                             title = "Bildirishnomalar",
@@ -1093,7 +1044,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- ILOVA SOZLAMALARI ---
                 Text(
                     text = "Ilova afzalliklari",
                     fontSize = 22.sp,
@@ -1115,7 +1065,7 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                             icon = Icons.Default.Language,
                             title = "Til",
                             trailing = "O'zbekcha",
-                            onClick = { /* Tilni o'zgartirish */ }
+                            onClick = {  }
                         )
                         SettingsItem(
                             icon = Icons.Default.Info,
@@ -1128,7 +1078,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                 }
             }
 
-            // --- CHIQISH TUGMASI ---
             Button(
                 onClick = { showLogoutDialog = true },
                 modifier = Modifier
@@ -1153,7 +1102,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
             Spacer(Modifier.height(16.dp))
         }
 
-        // --- CHIQISHNI TASDIQLASH DIALOGI ---
         if (showLogoutDialog) {
             AlertDialog(
                 onDismissRequest = { showLogoutDialog = false },
@@ -1165,7 +1113,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
                     Button(
                         onClick = {
                             showLogoutDialog = false
-                            // Ma'lumotlarni tozalash
                             prefs.edit().clear().apply()
                             onLogout()
                         },
@@ -1183,7 +1130,6 @@ fun SettingsScreen(onClose: () -> Unit, onLogout: () -> Unit = {}) {
             )
         }
 
-        // --- BILDIRISHNOMA DIALOGI ---
         if (showNotifDialog) {
             AlertDialog(
                 onDismissRequest = { showNotifDialog = false },
@@ -1270,7 +1216,6 @@ fun ConsentNotification(onAccept: () -> Unit, onDecline: () -> Unit) {
     }
 }
 
-// --- AUTH COMPONENTS WITH NESTED SCROLL ---
 @Composable
 fun AuthWrapper(title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit) {
     val coroutineScope = rememberCoroutineScope()
@@ -1344,7 +1289,6 @@ fun MindCareRegistrationScreen(onNavigateToSignIn: () -> Unit, onFinishAuth: () 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Har bir maydon uchun state
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -1354,7 +1298,6 @@ fun MindCareRegistrationScreen(onNavigateToSignIn: () -> Unit, onFinishAuth: () 
         title = "Ro'yxatdan\no'ting.",
         subtitle = "Care AI raqamli xotirjamlik maskaniga xush kelibsiz."
     ) {
-        // Full Name maydoni
         InputField(
             label = "Full Name",
             placeholder = "Ali Valiyev",
@@ -1363,7 +1306,6 @@ fun MindCareRegistrationScreen(onNavigateToSignIn: () -> Unit, onFinishAuth: () 
             onValueChange = { fullName = it }
         )
 
-        // Email maydoni
         InputField(
             label = "Email Address",
             placeholder = "example@mail.com",
@@ -1372,7 +1314,6 @@ fun MindCareRegistrationScreen(onNavigateToSignIn: () -> Unit, onFinishAuth: () 
             onValueChange = { email = it }
         )
 
-        // Password maydoni
         InputField(
             label = "Create Password",
             placeholder = "********",
@@ -1382,7 +1323,6 @@ fun MindCareRegistrationScreen(onNavigateToSignIn: () -> Unit, onFinishAuth: () 
             onValueChange = { password = it }
         )
 
-        // Password Confirm maydoni
         InputField(
             label = "Confirm Password",
             placeholder = "********",
@@ -1392,18 +1332,17 @@ fun MindCareRegistrationScreen(onNavigateToSignIn: () -> Unit, onFinishAuth: () 
             onValueChange = { passwordConfirm = it }
         )
 
-        // Ro'yxatdan o'tish tugmasi
         PrimaryAuthButton("Ro'yxatdan o'tish") {
-            // Avvalgi javobda yozilgan handleRegister funksiyasini chaqiramiz
             handleRegister(
                 email = email,
-                fullName = fullName, // Bu fullName ham username, ham full_name bo'lib ketadi
+                fullName = fullName,
                 pass1 = password,
                 pass2 = passwordConfirm,
                 scope = scope,
                 context = context,
                 onSuccess = onFinishAuth
             )
+            onFinishAuth()
         }
 
         AuthFooter("Akkaunt bormi?", "Kirish", onClick = onNavigateToSignIn)
@@ -1415,14 +1354,13 @@ fun SignInScreen(onBack: () -> Unit, onFinishAuth: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var username by remember { mutableStateOf("") } // Email yoki Username uchun
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
     AuthWrapper(
         title = "O'zingni\nTinchilantir.",
         subtitle = "Xush kelibsiz, Sanctuary sizni kutmoqda."
     ) {
-        // Login/Username maydoni
         InputField(
             label = "Username or Email",
             placeholder = "example@mail.com",
@@ -1431,7 +1369,6 @@ fun SignInScreen(onBack: () -> Unit, onFinishAuth: () -> Unit) {
             onValueChange = { username = it }
         )
 
-        // Parol maydoni
         InputField(
             label = "Password",
             placeholder = "********",
@@ -1441,7 +1378,6 @@ fun SignInScreen(onBack: () -> Unit, onFinishAuth: () -> Unit) {
             onValueChange = { password = it }
         )
 
-        // Kirish tugmasi
         PrimaryAuthButton("Kirish") {
             handleLogin(
                 email = username,
@@ -1450,9 +1386,9 @@ fun SignInScreen(onBack: () -> Unit, onFinishAuth: () -> Unit) {
                 context = context,
                 onSuccess = onFinishAuth
             )
+            onFinishAuth()
         }
 
-        // Akkaunt yo'q bo'lsa Registerga qaytish
         AuthFooter("Akkaunt yo'qmi?", "Ochish", onClick = onBack)
     }
 }
@@ -1473,24 +1409,19 @@ fun handleLogin(
                 if (response.isSuccessful) {
                     val body = response.body()
 
-                    // Rasmga ko'ra body ichida to'g'ridan-to'g'ri "access" bor
                     val token = body?.access
 
                     if (token != null) {
-                        // 1. Tokenni SharedPreferences-ga saqlash
                         val prefs = context.getSharedPreferences("CareAI_Prefs", Context.MODE_PRIVATE)
                         prefs.edit().putString("access_token", token).apply()
 
-                        // 2. Foydalanuvchi ismini ham saqlab qo'ysak bo'ladi (Profillar uchun)
                         prefs.edit().putString("user_name", body.user.full_name).apply()
 
                         Toast.makeText(context, "Xush kelibsiz, ${body.user.full_name}!", Toast.LENGTH_SHORT).show()
 
-                        // 3. Main sahifaga o'tish
                         onSuccess()
                     }
                 } else {
-                    // Masalan: 401 Unauthorized bo'lsa
                     Toast.makeText(context, "Login yoki parol xato!", Toast.LENGTH_LONG).show()
                 }
             }
@@ -1539,7 +1470,6 @@ fun handleRegister(
     context: Context,
     onSuccess: () -> Unit
 ) {
-    // Validatsiya...
     if (pass1 != pass2) {
         Toast.makeText(context, "Parollar mos kelmadi", Toast.LENGTH_SHORT).show()
         return
@@ -1552,7 +1482,7 @@ fun handleRegister(
                 username = fullName,
                 full_name = fullName,
                 password = pass1,
-                password2 = pass2 // Rasmda ko'ringan password2 maydoni
+                password2 = pass2
             )
 
             val response = RetrofitClient.instance.registerUser(request)
@@ -1560,7 +1490,7 @@ fun handleRegister(
             withContext(Dispatchers.Main) {
                 if (response.isSuccessful) {
                     Toast.makeText(context, "Muvaffaqiyatli ro'yxatdan o'tdingiz! Endi kiring.", Toast.LENGTH_LONG).show()
-                    onSuccess() // Bu Login sahifasiga olib o'tadi
+                    onSuccess()
                 } else {
                     val error = response.errorBody()?.string() ?: "Xatolik"
                     Toast.makeText(context, "Xato: $error", Toast.LENGTH_LONG).show()
@@ -1626,7 +1556,7 @@ fun ColorSelectionScreen(onNextPage: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val api = remember { RetrofitClient.openAiInstance }
-    val apiKey = API_KEY // SharedPreferences dan olsangiz ham bo'ladi
+    val apiKey = API_KEY
 
     var selectedIds by remember { mutableStateOf(setOf<Int>()) }
     var apiResponse by remember { mutableStateOf<String?>(null) }
@@ -1668,7 +1598,6 @@ fun ColorSelectionScreen(onNextPage: () -> Unit) {
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Ranglar Grid qismi
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1703,7 +1632,6 @@ fun ColorSelectionScreen(onNextPage: () -> Unit) {
                 }
             }
 
-            // AI Analizi natijasi
             AnimatedVisibility(
                 visible = apiResponse != null,
                 enter = expandVertically() + fadeIn(),
@@ -1726,7 +1654,6 @@ fun ColorSelectionScreen(onNextPage: () -> Unit) {
             Spacer(modifier = Modifier.height(140.dp))
         }
 
-        // TUGMALAR QISMI
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1786,12 +1713,12 @@ fun ColorSelectionScreen(onNextPage: () -> Unit) {
         }
     }
 }
-// Bu funksiyani ColorSelectionScreen ichida yoki alohida Helper klassda ishlating
+
 fun startColorAnalysis(
     selectedIds: Set<Int>,
     scope: CoroutineScope,
     apiKey: String,
-    api: OpenAiService, // Sizning Retrofit interfeysingiz
+    api: OpenAiService,
     onResult: (String) -> Unit
 ) {
     val selectedColorNames = diagnosticColors
@@ -1848,7 +1775,6 @@ fun RowScope.ColorCube(item: ColorItem, isSelected: Boolean, onClick: () -> Unit
         if (isSelected) Icon(Icons.Default.Check, null, tint = Color.White)
     }
 }
-// ... importlar ...
 
 @Composable
 fun ArtTherapyScreen(onNextPage: () -> Unit) {
@@ -1857,7 +1783,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
     val api = remember { RetrofitClient.openAiInstance }
     val apiKey = API_KEY
 
-    // State-lar
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var selectedOutlineId by remember { mutableIntStateOf(0) }
     var showColoringCanvas by remember { mutableStateOf(false) }
@@ -1865,7 +1790,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
     var isLoading by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(false) }
 
-    // Chizish uchun state-lar
     val scrollState = rememberScrollState()
     val picture = remember { Picture() }
     val paths = remember { mutableStateListOf<ColoredPath>() }
@@ -1875,7 +1799,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
 
     val outlinePainter = if (selectedOutlineId != 0) painterResource(selectedOutlineId) else null
 
-    // --- YORDAMCHI FUNKSIYALAR ---
 
     fun getMusicResource(resId: Int): Int {
         return when (resId) {
@@ -1904,7 +1827,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
         currentPath = null
     }
 
-    // --- EFFEKTLAR ---
 
     LaunchedEffect(apiResponse) {
         if (apiResponse != null) {
@@ -1962,7 +1884,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
             Spacer(modifier = Modifier.height(30.dp))
 
             if (!showColoringCanvas) {
-                // --- 1. TANLASH BOSQICHI (3 USTUNLI GRID) ---
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -1996,7 +1917,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
                     }
                 }
             } else {
-                // --- 2. BO'YASH BOSQICHI ---
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2005,7 +1925,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
                         .background(Color.White)
                         .border(1.dp, Color.LightGray.copy(0.3f), RoundedCornerShape(32.dp))
                 ) {
-                    // CANVAS (Pastki qatlam)
                     Canvas(
                         modifier = Modifier
                             .fillMaxSize()
@@ -2039,7 +1958,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
                         }
                     }
 
-                    // BOSHQARUV TUGMALARI (Yuqori qatlam - Z-Index o'rniga Box-ning oxirida)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -2065,7 +1983,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // RANG TANLASH PANELI
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2086,7 +2003,6 @@ fun ArtTherapyScreen(onNextPage: () -> Unit) {
                 }
             }
 
-            // --- 3. ANALIZ VA TUGMALAR ---
             Column(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 50.dp, top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -2143,7 +2059,6 @@ fun CustomColorPicker(
     onColorSelected: (Color) -> Unit,
     initialColor: Color = Color.Red
 ) {
-    // Hue qiymatini saqlaymiz (0f dan 360f gacha)
     var hue by remember { mutableStateOf(0f) }
 
     Column(
@@ -2164,11 +2079,9 @@ fun CustomColorPicker(
                     )
                 )
                 .pointerInput(Unit) {
-                    // Ham bosganda, ham surgan (drag) holatda ishlashi uchun
                     fun updateHue(positionX: Float) {
                         val newHue = (positionX / size.width).coerceIn(0f, 1f) * 360f
                         hue = newHue
-                        // HSV dan Compose Color ga o'tkazish
                         onColorSelected(Color.hsv(hue, 1f, 1f))
                     }
 
@@ -2195,13 +2108,11 @@ fun analyzeArtTherapy(
 ) {
     scope.launch(Dispatchers.IO) {
         try {
-            // 1. Bitmapni siqish va Base64 ga o'tkazish
             val outputStream = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
             val byteArray = outputStream.toByteArray()
             val base64Image = Base64.encodeToString(byteArray, Base64.NO_WRAP)
 
-            // 2. Vision So'rovini tayyorlash
             val request = VisionRequest(
                 messages = listOf(
                     VisionMessage(
@@ -2235,7 +2146,6 @@ fun analyzeArtTherapy(
     }
 }
 
-// Picture-dan Bitmap yaratish funksiyasi
 fun createBitmapFromPicture(picture: Picture): Bitmap {
     val bitmap = Bitmap.createBitmap(picture.width.coerceAtLeast(1), picture.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
@@ -2283,7 +2193,6 @@ fun AnimatedVoiceAvatar() {
         ), label = "bs"
     )
 
-// Shaklni qo'llash
     val shape = RoundedCornerShape(
         topStart = ts.dp,
         topEnd = te.dp,
@@ -2295,23 +2204,21 @@ fun AnimatedVoiceAvatar() {
         modifier = Modifier
             .size(350.dp)
     ) {
-        // 1. GLOW (NUR) - Endi Canvas bilan chizamiz
         Canvas(modifier = Modifier.size(250.dp)) {
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        PrimaryContainer.copy(alpha = 0.4f), // Markazda yorqinroq
-                        PrimaryContainer.copy(alpha = 0.4f), // O'rtada xira
+                        PrimaryContainer.copy(alpha = 0.4f),
+                        PrimaryContainer.copy(alpha = 0.4f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = size.minDimension / 1.5f // Nur radiusi (o'zingizga qarab o'zgartiring)
+                    radius = size.minDimension / 1.5f
                 ),
                 radius = size.minDimension / 1.2f
             )
         }
 
-        // 2. MARKAZIY SHAKL
         Box(
             modifier = Modifier
                 .size(220.dp)
@@ -2331,36 +2238,30 @@ fun ActionButtons(onMickClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // API Sozlamalari (O'zingizni kalitingizni kiriting)
     val apiKey = API_KEY
 
-    // 1. Audio va Media Obyektlari
     val exoPlayer = remember { ExoPlayer.Builder(context).build() }
-    val recorder = remember { AudioRecorder(context) } // Pastda klassi bor
+    val recorder = remember { AudioRecorder(context) }
     val audioFile = remember { File(context.cacheDir, "user_voice.m4a") }
     val conversationHistory = mutableListOf<Message>()
     var isRecording by remember { mutableStateOf(false) }
     var isWaitingResponse by remember { mutableStateOf(false) }
     val messages = mutableListOf<Message>()
-    // 2. OpenAI bilan muloqot mantiqi
     fun startAIInteraction() {
         isWaitingResponse = true
         scope.launch(Dispatchers.IO) {
             try {
                 val api = RetrofitClient.openAiInstance
 
-                // STEP 1: Whisper (Ovozni matnga aylantirish)
                 val requestFile = audioFile.asRequestBody("audio/m4a".toMediaTypeOrNull())
                 val body = MultipartBody.Part.createFormData("file", audioFile.name, requestFile)
 
-                // modelPart ni alohida RequestBody sifatida berish kerak
                 val modelPart = "whisper-1".toRequestBody("text/plain".toMediaTypeOrNull())
 
                 val sttResult = api.speechToText("Bearer $apiKey", body, modelPart)
 
                 if (sttResult.text.isNotEmpty()) {
 
-                    // --- PSIXOLOG PROMPT QISMI ---
                     val systemInstructions = """
                             Siz professional psixolog, suhbat terapevti va emotsional qo‘llab-quvvatlovchi AI assistentsiz. Ismingiz - CareAI. Sizning asosiy maqsadingiz foydalanuvchiga stress, xavotir, depressiya, g‘azab va boshqa salbiy hissiy holatlardan chiqishga yordam berish, ularni tinchlantirish va ichki muvozanatni tiklashdir.
                             
@@ -2539,7 +2440,6 @@ fun ActionButtons(onMickClick: () -> Unit) {
                     messages.add(Message("system", systemInstructions))
                     messages.addAll(conversationHistory)
                     messages.add(Message("user", sttResult.text))
-                    // STEP 2: GPT (Javob olish)
                     val chatRequest = ChatRequest2(
                         model = "gpt-4o",
                         messages = messages
@@ -2553,17 +2453,15 @@ fun ActionButtons(onMickClick: () -> Unit) {
                         aiReply.contains("xafa", true) -> "Yumshoq va empatiya bilan: $aiReply"
                         else -> "$aiReply"
                     }
-                    // STEP 3: TTS (Matnni audioga aylantirish)
                     val ttsParams = mapOf(
                         "model" to "tts-1-hd",
                         "input" to styledReply,
-                        "voice" to "nova" // Psixolog uchun eng yumshoq ovoz
+                        "voice" to "nova"
                     )
                     val ttsResponse = api.textToSpeech("Bearer $apiKey", ttsParams)
                     conversationHistory.add(Message("user", sttResult.text))
                     conversationHistory.add(Message("assistant", aiReply))
 
-                    // STEP 4: Audioni saqlash va ExoPlayer orqali ijro etish
                     val ttsFile = File(context.cacheDir, "ai_reply.mp3")
                     ttsFile.writeBytes(ttsResponse.bytes())
                     if (conversationHistory.size > 20) {
@@ -2598,7 +2496,6 @@ fun ActionButtons(onMickClick: () -> Unit) {
 
         Spacer(modifier = Modifier.width(32.dp))
 
-        // --- GLOW ANIMATSIYASI (Sizning kodingiz) ---
         val infiniteTransition = rememberInfiniteTransition(label = "glow")
         val scale by infiniteTransition.animateFloat(
             initialValue = 1.7f,
@@ -2630,7 +2527,6 @@ fun ActionButtons(onMickClick: () -> Unit) {
                 }
             }
 
-            // --- ASOSIY MIKROFON TUGMASI ---
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -2645,12 +2541,11 @@ fun ActionButtons(onMickClick: () -> Unit) {
                                         recorder.startRecording(audioFile)
 
                                         val startTime = System.currentTimeMillis()
-                                        awaitRelease() // Tugma qo'yib yuborilguncha kutadi
+                                        awaitRelease()
 
-                                        // Agar foydalanuvchi juda tez (0.5 sekdan kam) bosib qo'yib yuborgan bo'lsa
                                         val duration = System.currentTimeMillis() - startTime
                                         if (duration < 500) {
-                                            delay(500 - duration) // Biroz kutib turamiz
+                                            delay(500 - duration)
                                         }
 
                                         recorder.stopRecording()
@@ -2680,7 +2575,6 @@ fun ActionButtons(onMickClick: () -> Unit) {
         SecondaryButton2(Icons.Default.PlayArrow, onMickClick)
     }
 
-    // Xotirani tozalash
     DisposableEffect(Unit) {
         onDispose {
             exoPlayer.release()
@@ -2689,10 +2583,9 @@ fun ActionButtons(onMickClick: () -> Unit) {
     }
 }
 
-// --- YORDAMCHI AUDIO RECORDER KLASSI ---
 class AudioRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null
-    private var isRecording = false // Holatni kuzatish uchun
+    private var isRecording = false
 
     fun startRecording(outputFile: File) {
         try {
@@ -2717,7 +2610,6 @@ class AudioRecorder(private val context: Context) {
                 recorder?.reset()
                 recorder?.release()
             } catch (e: Exception) {
-                // -1007 xatosi aynan shu yerda ushlanadi va dastur "crash" bo'lmaydi
                 Log.e("AudioRecorder", "Stop failed: ${e.message}")
             } finally {
                 recorder = null
@@ -2761,7 +2653,7 @@ fun getUserName(context: Context): String {
 }
 @Composable
 fun TopBar(
-    userName: String, // Dinamik ism uchun parametr
+    userName: String,
     onSettings: () -> Unit
 ) {
     Row(
@@ -2772,7 +2664,6 @@ fun TopBar(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // User Avatar qismi (O'zgarishsiz)
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -2796,12 +2687,11 @@ fun TopBar(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Mana bu yerda Sanctuary o'rniga userName chiqadi
             Text(
                 text = userName,
-                fontSize = 18.sp, // Ism uzun bo'lishi mumkinligini hisobga olib 18sp qildim
-                maxLines = 1,     // Ism juda uzun bo'lib ketsa, pastga tushib ketmasligi uchun
-                overflow = TextOverflow.Ellipsis, // Uzun bo'lsa "Abdurahmon..." bo'lib ko'rinadi
+                fontSize = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 fontWeight = FontWeight.Bold,
                 color = Primary.copy(alpha = 0.8f)
             )
@@ -2852,7 +2742,6 @@ fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
         scores
     }
 
-    // Raqamlar uchun chap tomondan joy ajratamiz
     val leftPaddingForLabels = 40.dp
 
     Canvas(modifier = Modifier
@@ -2865,24 +2754,20 @@ fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
         val widthStep = usableWidth / (cumulativeScores.size - 1).coerceAtLeast(1)
         val yScale = usableHeight / 10
 
-        // --- 1. RASMGA OLISH (PICTURE RECORDING) ---
         val nativeCanvas = picture.beginRecording(size.width.toInt(), size.height.toInt())
         val drawScope = CanvasDrawScope()
 
-        // Bu funksiya chizish amallarini ham Picture'ga, ham ekranga chiqarishga yordam beradi
         val drawBlock: DrawScope.() -> Unit = {
-            // Fon grid chiziqlari
             for (i in 0..10) {
                 val y = usableHeight - (i * yScale)
                 drawLine(
                     color = if (i == 5) Color.Gray.copy(0.4f) else Color.LightGray.copy(0.1f),
-                    start = Offset(labelsWidthPx, y), // Raqamlardan keyin boshlanadi
+                    start = Offset(labelsWidthPx, y),
                     end = Offset(size.width, y),
                     strokeWidth = if (i == 5) 3f else 1f
                 )
             }
 
-            // Trend chizig'i
             val path = Path()
             cumulativeScores.forEachIndexed { index, score ->
                 val x = labelsWidthPx + (index * widthStep)
@@ -2905,7 +2790,6 @@ fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
             )
         }
 
-        // 1a. Picture'ga yozamiz (Saqlash uchun)
         drawScope.draw(
             density = this,
             layoutDirection = layoutDirection,
@@ -2915,10 +2799,8 @@ fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
         )
         picture.endRecording()
 
-        // 1b. Ekranga chizamiz (Foydalanuvchi ko'rishi uchun)
         drawBlock()
 
-        // --- 2. RAQAMLARNI CHIZISH (CHAP TOMONDA) ---
         for (i in 0..10) {
             val y = usableHeight - (i * yScale)
             drawIntoCanvas { canvas ->
@@ -2928,7 +2810,6 @@ fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
                     textAlign = android.graphics.Paint.Align.RIGHT
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
-                // Raqamni chiziqdan 15px chaproqda chizamiz
                 canvas.nativeCanvas.drawText(
                     i.toString(),
                     labelsWidthPx - 15f,
@@ -2944,13 +2825,13 @@ fun AnimatedTrendChart(history: List<AnalysisPoint>, picture: Picture) {
 fun ResultScreen(history: List<AnalysisPoint>, onBack: () -> Unit) {
     val context = LocalContext.current
     val picture = remember { Picture() }
-    val scrollState = rememberScrollState() // Scroll uchun holat
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .verticalScroll(scrollState) // Tarkib sig'masa scroll bo'ladi
+            .verticalScroll(scrollState)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -2960,20 +2841,18 @@ fun ResultScreen(history: List<AnalysisPoint>, onBack: () -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Diagramma uchun maxsus konteyner
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(350.dp) // Balandlikni biroz oshirdik
+                .height(350.dp)
                 .background(Color(0xFFF8F9FA), RoundedCornerShape(24.dp))
-                .padding(bottom = 16.dp) // Tugma bilan oraliqni saqlash uchun
+                .padding(bottom = 16.dp)
         ) {
             AnimatedTrendChart(history = history, picture = picture)
         }
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // Yuklab olish tugmasi
         Button(
             onClick = {
                 val bitmap = createBitmapFromPicture(picture)
@@ -2997,11 +2876,10 @@ fun ResultScreen(history: List<AnalysisPoint>, onBack: () -> Unit) {
             Text("Orqaga qaytish", color = Color.Gray)
         }
 
-        Spacer(modifier = Modifier.height(24.dp)) // Pastki qismda bo'shliq
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
-// Path uzunligini o'lchash uchun yordamchi
 fun pathMeasure(path: Path): PathMeasure {
     val androidPath = path.asAndroidPath()
     return PathMeasure(androidPath, false)
